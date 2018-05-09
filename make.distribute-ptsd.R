@@ -71,7 +71,13 @@ lift.over <- function(chr.input, gwas.tab, temp.hdr) {
     return(as.data.frame(out.tab))
 }
 
+## Full pipeline for hg38
 proc.gwas <- function(gwas.file, gwas.name, ref.snps.tab) {
+
+    out.files <- out.dir %&&% gwas.name %&&% '/' %&&% 1:22 %&&% '.txt.gz'
+
+    dir.create(dirname(out.files[1]), recursive = TRUE)
+    if(all(file.exists(out.files))) return(NULL)
 
     gwas.tab <- read.ptsd(gwas.file, ref.snps.tab = ref.snps.tab)
 
@@ -81,8 +87,30 @@ proc.gwas <- function(gwas.file, gwas.name, ref.snps.tab) {
 
     dir.create(out.dir %&&% gwas.name, recursive = TRUE)
 
-    sapply(1:22, function(chr) write_tsv(lift.list[[chr]], path = out.dir %&&% gwas.name %&&% '/' %&&% chr %&&% '.txt.gz'))
+    for(.chr in 1:22) {
+        if(!file.exists(out.files[.chr])) {
+            write_tsv(lift.list[[.chr]], path = out.files[.chr])
+        }
+    }
+}
 
+proc.gwas.hg19 <- function(gwas.file, gwas.name, ref.snps.tab) {
+
+    out.files <- out.dir %&&% gwas.name %&&% '/' %&&% 1:22 %&&% '.txt.gz'
+
+    dir.create(dirname(out.files[1]), recursive = TRUE)
+
+    if(all(file.exists(out.files))) return(NULL)
+
+    gwas.tab <- read.ptsd(gwas.file, ref.snps.tab = ref.snps.tab) %>%
+        select(chr, snp.loc, rs, gwas.a1, gwas.a2, gwas.beta, gwas.se, gwas.p) %>%
+            mutate(gwas.z = gwas.beta / gwas.se)
+
+    for(.chr in 1:22) {
+        if(!file.exists(out.files[.chr])) {
+            write_tsv(gwas.tab %>% filter(chr == .chr), out.files[.chr])
+        }
+    }
 }
 
 ref.snps.tab <- '1KG_EUR/chr' %&&% 1:22 %&&% '.bim' %>%
@@ -98,3 +126,18 @@ warnings()
 gwas.file <- 'PTSD/civilian_wave_1.5/ancestry_specific_civilian/EA/EA_civilian_5_wave1.51.txt.gz'
 gwas.name <- 'ptsd_civ_ea'
 proc.gwas(gwas.file, gwas.name, ref.snps.tab)
+
+warnings()
+
+## just use hg19
+gwas.file <- 'PTSD/military_wave_1.5/ancestry_specific_military/EA/EA_military_7_wave1.51.txt.gz'
+gwas.name <- 'hg19/ptsd_mil_ea'
+proc.gwas.hg19(gwas.file, gwas.name, ref.snps.tab)
+
+warnings()
+
+gwas.file <- 'PTSD/civilian_wave_1.5/ancestry_specific_civilian/EA/EA_civilian_5_wave1.51.txt.gz'
+gwas.name <- 'hg19/ptsd_civ_ea'
+proc.gwas.hg19(gwas.file, gwas.name, ref.snps.tab)
+
+warnings()
