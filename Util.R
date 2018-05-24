@@ -81,23 +81,23 @@ calc.qtl.stat <- function(xx, yy) {
         as.data.frame() %>%
             dplyr::mutate(x.col = 1:n()) %>%
                 tidyr::gather(key = 'y.col', value = 'beta', y.cols)
-    
+
     resid.se.tab <- resid.se.mat %>%
         as.data.frame() %>%
             dplyr::mutate(x.col = 1:n()) %>%
                 tidyr::gather(key = 'y.col', value = 'resid.se', y.cols)
-    
+
     nobs.tab <- n.obs %>%
         as.data.frame() %>%
             dplyr::mutate(x.col = 1:n()) %>%
                 tidyr::gather(key = 'y.col', value = 'n', y.cols)
-    
+
     out.tab <- beta.tab %>%
         left_join(nobs.tab) %>%
             left_join(resid.se.tab) %>%
                 dplyr::mutate(se = resid.se/sqrt(n)) %>%
                     dplyr::mutate(p.val = zscore.pvalue(beta/se))
-    
+
     out.tab <- out.tab %>%
         mutate(x.col = as.integer(x.col)) %>%
             mutate(y.col = as.integer(y.col))
@@ -109,7 +109,7 @@ fast.cor <- function(x, y) {
     x.sd <- apply(x, 2, sd, na.rm = TRUE)
     y.sd <- apply(y, 2, sd, na.rm = TRUE)
     ret <- fast.cov(scale(x, scale = FALSE), scale(y, scale = FALSE))
-    ret <- sweep(sweep(ret, 1, x.sd, `/`), 2, y.sd, `/`)    
+    ret <- sweep(sweep(ret, 1, x.sd, `/`), 2, y.sd, `/`)
     return(ret)
 }
 
@@ -155,14 +155,14 @@ find.cor.idx <- function(Y1, Y0, n.ctrl, p.val.cutoff = 1) {
     colnames(Y0) <- 1:ncol(Y0)
 
     require(dplyr)
-    
+
     y01.stat <- calc.qtl.stat(Y0, Y1) %>%
         dplyr::rename(y0 = x.col, y1 = y.col) %>%
             dplyr::filter(p.val < p.val.cutoff)
 
     ret <- y01.stat %>% dplyr::group_by(y1) %>%
         dplyr::top_n(n = -n.ctrl, wt = p.val)
-    
+
     return(ret$y0)
 }
 
@@ -171,33 +171,33 @@ find.cor.idx <- function(Y1, Y0, n.ctrl, p.val.cutoff = 1) {
 subset.plink <- function(plink.hdr, chr, plink.lb, plink.ub, temp.dir) {
     require(zqtl)
     require(dplyr)
-    
+
     .error <- function(e) {
         log.msg('No QTL here!\n')
         return(NULL)
     }
-    
+
     .subset <- function(plink.hdr, chr, plink.lb, plink.ub, temp.dir) {
-        
+
         chr.num <- gsub(pattern = 'chr', replacement = '', chr) %>% as.integer()
         plink.cmd <- sprintf('./bin/plink --bfile %s --make-bed --geno 0.05 --maf 0.05 --chr %d --from-bp %d --to-bp %d --out %s', plink.hdr, chr.num, plink.lb, plink.ub, glue(temp.dir, '/plink'))
         system(plink.cmd)
-        
+
         plink <- read.plink(glue(temp.dir, '/plink'))
         colnames(plink$BIM) <- c('chr', 'rs', 'missing', 'snp.loc', 'plink.a1', 'plink.a2')
         colnames(plink$FAM) <- c('fam', 'iid', 'father', 'mother', 'sex.code', '.pheno')
         plink$FAM <- plink$FAM %>% mutate(iid = sapply(iid, gsub, pattern = 'GTEX-', replacement = ''))
-        
+
         if(any(is.logical(plink$BIM$plink.a1))) {
             plink$BIM$plink.a1 <- 'T'
         }
-        
+
         if(any(is.logical(plink$BIM$plink.a2))) {
             plink$BIM$plink.a2 <- 'T'
         }
         return(plink)
     }
-    
+
     plink <- tryCatch(.subset(plink.hdr, chr, plink.lb, plink.ub, temp.dir),
                       error = .error)
     return(plink)
@@ -227,7 +227,7 @@ match.allele <- function(gwas.tab, plink.obj, qtl.tab) {
                 dplyr::mutate(gwas.beta.flip = if_else(qtl.a1 != plink.a1, -gwas.beta, gwas.beta)) %>%
                     dplyr::mutate(qtl.z.flip = if_else(qtl.a1 != plink.a1, -qtl.z, qtl.z)) %>%
                         dplyr::mutate(qtl.beta.flip = if_else(qtl.a1 != plink.a1, -qtl.beta, qtl.beta))
-    
+
     ret <- ret %>%
         dplyr::select(-gwas.z, -gwas.beta, -qtl.z, -qtl.beta,
                       -qtl.a1, -qtl.a2, -gwas.a1, -gwas.a2) %>%
@@ -284,7 +284,7 @@ match.plink <- function(plink.gwas, plink.qtl) {
     flip.tab <- ret.gwas$BIM %>% mutate(gwas.x.pos = 1:n()) %>%
         left_join(ret.qtl$BIM %>% mutate(qtl.x.pos = 1:n()),
                   by = c('chr', 'snp.loc'),
-                  suffix = c('.gwas', '.qtl')) %>%                      
+                  suffix = c('.gwas', '.qtl')) %>%
                       filter(plink.a1.gwas != plink.a1.qtl)
 
     ret.qtl$BIM[flip.tab$qtl.x.pos, ] <- ret.gwas$BIM[flip.tab$gwas.x.pos, ]
@@ -335,11 +335,11 @@ make.zqtl.data <- function(matched.stat) {
             left_join(.temp %>% dplyr::select(x.pos, gwas.se))
 
     .xx <- match(x.pos, qtl.beta$x.pos)
-    .mm <- match(med.id, colnames(qtl.beta)) 
+    .mm <- match(med.id, colnames(qtl.beta))
     qtl.beta <- as.matrix(qtl.beta[.xx, .mm])
 
     .xx <- match(x.pos, qtl.z$x.pos)
-    .mm <- match(med.id, colnames(qtl.z)) 
+    .mm <- match(med.id, colnames(qtl.z))
     qtl.z <- as.matrix(qtl.z[.xx, .mm])
 
     qtl.se <- qtl.beta / qtl.z
@@ -378,7 +378,7 @@ make.zqtl.null <- function(X, se.mat, eig.tol, beta.mat = NULL, is.indep = TRUE,
 
         ## R = V' D2 V
         ## (a) sample theta.tilde ~ N(0, D^2) <=> D * N(0, I)
-        ## (b) sample beta.hat ~ se * V * theta.tilde 
+        ## (b) sample beta.hat ~ se * V * theta.tilde
         d <- nrow(svd.out$D)
         theta.tilde <- sweep(.rnorm(d, n.traits), 1, svd.out$D, `*`)
         beta.null.mat <- (t(svd.out$V.t) %*% theta.tilde) * se.mat
@@ -394,7 +394,7 @@ make.zqtl.null <- function(X, se.mat, eig.tol, beta.mat = NULL, is.indep = TRUE,
         L <- chol(z.cov, pivot = FALSE) # C = L' * L
 
         z.null <- Vd %*% .rnorm(d, n.traits) %*% L
-        beta.null.mat <- z.null * se.mat 
+        beta.null.mat <- z.null * se.mat
 
     }
 
@@ -537,4 +537,17 @@ order.pair <- function(pair.tab) {
     rr <- M[, 1]
 
     list(rows = rr[ro], cols = cc[co], M = M)
+}
+
+################################################################
+simplify.ensg <- function(tab) {
+    require(tidyr)
+    tab %>% tidyr::separate(ensg, c('ensg', '.remove'), sep = '[.]') %>%
+        select(-.remove)
+}
+
+read.coding.genes <- function() {
+    .cols <- c('chr', 'lb', 'ub', 'strand', 'ensg', 'hgnc')
+    read_tsv('coding.genes.txt.gz', col_names = .cols, 'ciiccc_') %>%
+                 simplify.ensg()
 }
